@@ -85,20 +85,15 @@ int main(int argc, char *argv[])
 
     validate_send_values(plaintext_string, key_string);
 
-    printf("SENDING PLAINTEXT AND KEY\n");
     send_string(plaintext_string, socket_fd);
     send_string(key_string, socket_fd);
-    printf("SENT PLAINTEXT AND KEY\n");
 
     char *buffer = (char *) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
 
-    int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+    int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0); // This breaks it for some reason
     printf("buffer: %s\n", buffer);
 
-    // printf("READING FROM BUFFER\n");
-    // int n_read = recv(socket_fd, buffer, BUFFER_SIZE, 0);
-    // printf("BUFFER: %s\n", buffer);
 
     // char *buffer = (char *) malloc(BUFFER_SIZE);
     // memset(buffer, '\0', BUFFER_SIZE);

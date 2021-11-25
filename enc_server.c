@@ -32,6 +32,7 @@ void error_and_exit(char []);
 void setup_socket_addr(struct sockaddr_in *, int);
 void find_stop_indices(const char *, int *, int *);
 void send_string(char *, int);
+void handle_connection(int);
 
 int main(int argc, char *argv[])
 {
@@ -54,84 +55,31 @@ int main(int argc, char *argv[])
     
     listen(listen_socket, MAX_CONNECTIONS);
 
-    int conn_sock;
+    int socket_fd;
     struct sockaddr_in client_addr;
     socklen_t client_info_size = sizeof(client_addr);
+    int n_children = 0;
     while (true)
     {
         // Connect
-        conn_sock = accept( listen_socket, (struct sockaddr *) &client_addr, &client_info_size );
-        if (conn_sock < 0)
+        socket_fd = accept( listen_socket, (struct sockaddr *) &client_addr, &client_info_size );
+        if (socket_fd < 0)
             error_and_exit("Error: failed to accept connection");
 
-        // Get data from enc_client
-        char *buffer = (char *) malloc(BUFFER_SIZE);
-        memset(buffer, '\0', BUFFER_SIZE);
-
-        int full_string_size = BUFFER_SIZE;
-        char *full_recd_string = (char *) malloc(full_string_size);
-        memset(full_recd_string, '\0', full_string_size);
-
-        int n_read = 0;
-        int total_n_read = 0;
-        do
+        n_children++;
+        pid_t pid = fork();
+        if (pid < 0)
+            fprintf(stderr, "Error: fork() failed\n");
+        else if (pid > 0)
+            close(socket_fd);
+        else
         {
-            n_read = recv(conn_sock, buffer, BUFFER_SIZE, 0);
-            if (n_read < 0)
-                fprintf(stderr, "Error: failed to read from socket\n");
-
-            total_n_read += n_read;
-
-            if (total_n_read % full_string_size == 0)
-            {
-                full_string_size *= 2;
-                full_recd_string = (char *) realloc(full_recd_string, full_string_size);
-            }
-
-            strcat(full_recd_string, buffer);
-            memset(buffer, '\0', BUFFER_SIZE);
-        } while (n_read > 0);
-
-        printf("Got %s\n", full_recd_string);
-
-        // Find stop markers
-        int stop_idx_1, stop_idx_2;
-        find_stop_indices(full_recd_string, &stop_idx_1, &stop_idx_2);
-
-        // Extract plaintext from sent data
-        char *plaintext = (char *) malloc(stop_idx_1 + 1);
-        memset(plaintext, '\0', stop_idx_1 + 1);
-        strncpy(plaintext, full_recd_string, stop_idx_1);
-
-        // Extract key from sent data
-        char *key = (char *) malloc(stop_idx_2 - stop_idx_1 + 1);
-        memset(key, '\0', stop_idx_2 - stop_idx_1 + 1);
-        strncpy(key, &full_recd_string[stop_idx_1 + 1], stop_idx_2 - stop_idx_1 - 1);
-
-        char *ciphertext = (char *) malloc(strlen(plaintext) + 1);
-        memset(ciphertext, '\0', strlen(plaintext) + 1);
-
-        for (int i = 0; i < strlen(plaintext); i++)
-        {
-            int plain_val = plaintext[i] == ' ' ? 0 : plaintext[i] - 64;
-            int key_val = key[i] == ' ' ? 0 : key[i] - 64;
-            int ciphertext_val = (plain_val + key_val) % 27;
-            ciphertext[i] = ciphertext_val == 0 ? ' ' : ciphertext_val + 64;
+            if (n_children > 5)
+                exit(EXIT_SUCCESS);
+            close(listen_socket);
+            handle_connection(socket_fd);
+            exit(EXIT_SUCCESS);
         }
-        printf("Sending %s\n", ciphertext);
-
-        int msg_len = strlen(ciphertext) + 1;
-        char *message = (char *) malloc(msg_len);
-        memset(message, '\0', msg_len);
-        strcpy(message, ciphertext);
-        strcat(message, "@");
-
-        int n_written = send(conn_sock, message, strlen(message), 0);
-        if (n_written < 0)
-            fprintf(stderr, "Error: failed to write to socket\n");
-
-        free(buffer);
-        free(full_recd_string);
     }
 
     return EXIT_SUCCESS;
@@ -183,4 +131,77 @@ void send_string(char *string_to_send, int socket_fd)
     int n_written = send(socket_fd, message, strlen(message), 0);
     if (n_written < 0)
         fprintf(stderr, "Error: failed to write to socket\n");
+}
+
+void handle_connection(int socket_fd)
+{
+    // Get data from enc_client
+    char *buffer = (char *) malloc(BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
+
+    int full_string_size = BUFFER_SIZE;
+    char *full_recd_string = (char *) malloc(full_string_size);
+    memset(full_recd_string, '\0', full_string_size);
+
+    int n_read = 0;
+    int total_n_read = 0;
+    do
+    {
+        n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+        if (n_read < 0)
+            fprintf(stderr, "Error: failed to read from socket\n");
+
+        total_n_read += n_read;
+
+        if (total_n_read % full_string_size == 0)
+        {
+            full_string_size *= 2;
+            full_recd_string = (char *) realloc(full_recd_string, full_string_size);
+        }
+
+        strcat(full_recd_string, buffer);
+        memset(buffer, '\0', BUFFER_SIZE);
+    } while (n_read > 0);
+
+    // Find stop markers
+    int stop_idx_1, stop_idx_2;
+    find_stop_indices(full_recd_string, &stop_idx_1, &stop_idx_2);
+
+    // Extract plaintext from sent data
+    char *plaintext = (char *) malloc(stop_idx_1 + 1);
+    memset(plaintext, '\0', stop_idx_1 + 1);
+    strncpy(plaintext, full_recd_string, stop_idx_1);
+
+    // Extract key from sent data
+    char *key = (char *) malloc(stop_idx_2 - stop_idx_1 + 1);
+    memset(key, '\0', stop_idx_2 - stop_idx_1 + 1);
+    strncpy(key, &full_recd_string[stop_idx_1 + 1], stop_idx_2 - stop_idx_1 - 1);
+
+    // Create ciphertext
+    char *ciphertext = (char *) malloc(strlen(plaintext) + 1);
+    memset(ciphertext, '\0', strlen(plaintext) + 1);
+
+    for (int i = 0; i < strlen(plaintext); i++)
+    {
+        int plain_val = plaintext[i] == ' ' ? 0 : plaintext[i] - 64;
+        int key_val = key[i] == ' ' ? 0 : key[i] - 64;
+        int ciphertext_val = (plain_val + key_val) % 27;
+        ciphertext[i] = ciphertext_val == 0 ? ' ' : ciphertext_val + 64;
+    }
+
+    // Send ciphertext
+    int msg_len = strlen(ciphertext) + 1;
+    char *message = (char *) malloc(msg_len);
+    memset(message, '\0', msg_len);
+    strcpy(message, ciphertext);
+    strcat(message, "@");
+
+    int n_written = send(socket_fd, message, strlen(message), 0);
+    if (n_written < 0)
+        fprintf(stderr, "Error: failed to write to socket\n");
+
+    printf("Recd: %s\nSending: %s\n", plaintext, ciphertext);
+
+    free(buffer);
+    free(full_recd_string);
 }
