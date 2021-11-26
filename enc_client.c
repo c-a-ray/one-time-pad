@@ -28,7 +28,7 @@ Connects to enc_server to encrypt text
 #include <stdbool.h>
 
 #define LOCALHOST "LOCALHOST"
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 4096
 
 struct Config 
 {
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
     fseek(fp_key, 0, SEEK_SET);
 
     args.key = (char *) malloc(sizeof(char) * (f_size + 1));
-    fread(args.key, f_size, 1, fp_plaintext);
+    fread(args.key, f_size, 1, fp_key);
     fclose(fp_key);
 
     // Validate plaintext and key; replace newline with NULL character
@@ -142,13 +142,22 @@ void validate_send_values(char *plaintext, char *key)
         key[key_len - 1] = '\0';
 
     if (key_len < plaintext_len)
+    {
+        fprintf(stderr, "Key length: %d\nPlaintext length: %d\n", key_len, plaintext_len);
         error_and_exit("Error: key is shorter than text to encrypt");
+    }
 
     for (int i = 0; i < plaintext_len; i++)
     {
         char ch = plaintext[i];
+        // printf("%c", ch);
+        if (ch == 0)
+            continue;
         if ((ch < 'A' && ch != ' ') || (ch > 'Z'))
+        {
+            fprintf(stderr, "Invalid character: %d\n", ch);
             error_and_exit("Error: invalid character in plaintext file");
+        }
     }
 }
 

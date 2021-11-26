@@ -25,7 +25,7 @@ Performs encryption via one-time pad
 
 #define MAX_PORT 65535
 #define MAX_CONNECTIONS 5
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 4096
 #define STOP_SIGNAL '@'
 
 struct Args 
@@ -197,8 +197,8 @@ void handle_connection(int socket_fd)
 
         total_n_read += n_read;
 
-        if (total_n_read % full_string_size == 0)
-        {
+        if ((float) total_n_read / (float) full_string_size > 1)
+        {            
             full_string_size *= 2;
             full_recd_string = (char *) realloc(full_recd_string, full_string_size);
         }
