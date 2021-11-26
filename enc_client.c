@@ -30,105 +30,80 @@ Connects to enc_server to encrypt text
 #define LOCALHOST "LOCALHOST"
 #define BUFFER_SIZE 256
 
-void error_and_exit(char []);
-void setup_socket_addr(struct sockaddr_in *, int);
-void validate_send_values(char *, char *);
-int count_digits(int);
-void send_string(char *, int);
-int find_stop_index(char *, int *);
-
-struct Args {
+struct Config {
     char *plaintext_filename;
     char *key_filename;
     int port;
 };
 
+struct Args {
+    char *plaintext;
+    char *key;
+    char *ciphertext;
+};
+
+void error_and_exit(char []);
+void setup_socket_addr(struct sockaddr_in *, int);
+void validate_send_values(char *, char *);
+int connect_to_server(int);
+int count_digits(int);
+void send_string(char *, int);
+int find_stop_index(char *, int *);
+void get_ciphertext_from_server(int, struct Args);
+
 int main(int argc, char *argv[])
 {
+    // Get command line arguments
     if (argc < 4)
         error_and_exit("Usage: enc_client $plaintext $key $port");
 
-    struct Args args = {
+    struct Config cfg = {
         plaintext_filename: argv[1],
         key_filename: argv[2],
         port: atoi(argv[3]),
     };
 
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0); 
-    if (socket_fd < 0)
-        error_and_exit("Error: failed to open socket");
+    // Extract values from specified files
+    struct Args args;
 
-    struct sockaddr_in server_addr;
-    setup_socket_addr(&server_addr, args.port);
-
-    if ( connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) )
-        error_and_exit("Error: failed to connect to enc_server");
-
-    FILE *plaintext_file = fopen(args.plaintext_filename, "rb");
-    if (plaintext_file == 0)
+    // Get plaintext from file
+    FILE *fp_plaintext = fopen(cfg.plaintext_filename, "rb");
+    if (fp_plaintext == 0)
         error_and_exit("Error: failed to open plaintext file");
-    fseek(plaintext_file, 0, SEEK_END);
-    long f_size = ftell(plaintext_file);
-    fseek(plaintext_file, 0, SEEK_SET);
-    char *plaintext_string = (char *) malloc(sizeof(char) * (f_size + 1));
-    fread(plaintext_string, f_size, 1, plaintext_file);
-    fclose(plaintext_file);
 
-    FILE *key_file = fopen(args.key_filename, "rb");
-    if (key_file == 0)
+    fseek(fp_plaintext, 0, SEEK_END);
+    long f_size = ftell(fp_plaintext);
+    fseek(fp_plaintext, 0, SEEK_SET);
+
+    args.plaintext = (char *) malloc(sizeof(char) * (f_size + 1));
+    fread(args.plaintext, f_size, 1, fp_plaintext);
+    fclose(fp_plaintext);
+
+    // Get key from file
+    FILE *fp_key = fopen(cfg.key_filename, "rb");
+    if (fp_key == 0)
         error_and_exit("Error: failed to open plaintext file");
-    fseek(key_file, 0, SEEK_END);
-    f_size = ftell(key_file);
-    fseek(key_file, 0, SEEK_SET);
-    char *key_string = (char *) malloc(sizeof(char) * (f_size + 1));
-    fread(key_string, f_size, 1, plaintext_file);
-    fclose(key_file);
 
-    validate_send_values(plaintext_string, key_string);
+    fseek(fp_key, 0, SEEK_END);
+    f_size = ftell(fp_key);
+    fseek(fp_key, 0, SEEK_SET);
 
-    send_string(plaintext_string, socket_fd);
-    send_string(key_string, socket_fd);
+    args.key = (char *) malloc(sizeof(char) * (f_size + 1));
+    fread(args.key, f_size, 1, fp_plaintext);
+    fclose(fp_key);
 
-    // char *buffer = (char *) malloc(BUFFER_SIZE);
-    // memset(buffer, '\0', BUFFER_SIZE);
+    // Validate plaintext and key; replace newline with NULL character
+    validate_send_values(args.plaintext, args.key);
 
-    // int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+    // Connect to enc_server
+    int socket_fd = connect_to_server(cfg.port);
 
-    char *buffer = (char *) malloc(BUFFER_SIZE);
-    memset(buffer, '\0', BUFFER_SIZE);
+    // Send plaintext and key to enc_server
+    send_string(args.plaintext, socket_fd);
+    send_string(args.key, socket_fd);
 
-    int full_string_size = BUFFER_SIZE;
-    char *full_recd_string = (char *) malloc(full_string_size);
-    memset(full_recd_string, '\0', full_string_size);
-
-    int n_read = 0;
-    int total_n_read = 0;
-    int stop_idx;
-    do
-    {
-        n_read = recv(socket_fd, buffer, BUFFER_SIZE, 0);
-        if (n_read < 0)
-            fprintf(stderr, "Error: failed to read from socket\n");
-
-        total_n_read += n_read;
-
-        if (total_n_read % full_string_size == 0)
-        {
-            full_string_size *= 2;
-            full_recd_string = (char *) realloc(full_recd_string, full_string_size);
-        }
-        
-        strcat(full_recd_string, buffer);
-        memset(buffer, '\0', BUFFER_SIZE);
-
-        find_stop_index(full_recd_string, &stop_idx);
-    } while (stop_idx == -1);
-
-    char *ciphertext = (char *) malloc(stop_idx + 1);
-    memset(ciphertext, '\0', stop_idx + 1);
-    strncpy(ciphertext, full_recd_string, stop_idx);
-
-    fprintf(stdout, "%s\n", ciphertext);
+    // Get ciphertext from server and write to stdout
+    get_ciphertext_from_server(socket_fd, args);
 
     return EXIT_SUCCESS;
 }
@@ -153,26 +128,41 @@ void setup_socket_addr(struct sockaddr_in *address, int port)
     memcpy( (char *) &address->sin_addr.s_addr, host_info->h_addr_list[0], host_info->h_length );
 }
 
-void validate_send_values(char *plaintext_string, char *key_string)
+void validate_send_values(char *plaintext, char *key)
 {
-    int plaintext_len = strlen(plaintext_string);
-    int key_len = strlen(key_string);
+    int plaintext_len = strlen(plaintext);
+    int key_len = strlen(key);
 
-    if (plaintext_string[plaintext_len - 1] == '\n')
-        plaintext_string[plaintext_len - 1] = '\0';
+    if (plaintext[plaintext_len - 1] == '\n')
+        plaintext[plaintext_len - 1] = '\0';
     
-    if(key_string[key_len - 1] == '\n')
-        key_string[key_len - 1] = '\0';
+    if(key[key_len - 1] == '\n')
+        key[key_len - 1] = '\0';
 
     if (key_len < plaintext_len)
         error_and_exit("Error: key is shorter than text to encrypt");
 
     for (int i = 0; i < plaintext_len; i++)
     {
-        char ch = plaintext_string[i];
+        char ch = plaintext[i];
         if ((ch < 'A' && ch != ' ') || (ch > 'Z'))
             error_and_exit("Error: invalid character in plaintext file");
     }
+}
+
+int connect_to_server(int port)
+{
+    int socket_fd = socket(AF_INET, SOCK_STREAM, 0); 
+    if (socket_fd < 0)
+        error_and_exit("Error: failed to open socket");
+
+    struct sockaddr_in server_addr;
+    setup_socket_addr(&server_addr, port);
+
+    if ( connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) )
+        error_and_exit("Error: failed to connect to enc_server");   
+
+    return socket_fd; 
 }
 
 int count_digits(int n)
@@ -228,4 +218,43 @@ int find_stop_index(char *message, int *stop_idx)
             break;
         }
     }
+}
+
+void get_ciphertext_from_server(int socket_fd, struct Args args)
+{
+    char *buffer = (char *) malloc(BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
+
+    int full_string_size = BUFFER_SIZE;
+    char *full_recd_string = (char *) malloc(full_string_size);
+    memset(full_recd_string, '\0', full_string_size);
+
+    int n_read = 0;
+    int total_n_read = 0;
+    int stop_idx;
+    do
+    {
+        n_read = recv(socket_fd, buffer, BUFFER_SIZE, 0);
+        if (n_read < 0)
+            fprintf(stderr, "Error: failed to read from socket\n");
+
+        total_n_read += n_read;
+
+        if (total_n_read % full_string_size == 0)
+        {
+            full_string_size *= 2;
+            full_recd_string = (char *) realloc(full_recd_string, full_string_size);
+        }
+        
+        strcat(full_recd_string, buffer);
+        memset(buffer, '\0', BUFFER_SIZE);
+
+        find_stop_index(full_recd_string, &stop_idx);
+    } while (stop_idx == -1);
+
+    args.ciphertext = (char *) malloc(stop_idx + 1);
+    memset(args.ciphertext, '\0', stop_idx + 1);
+    strncpy(args.ciphertext, full_recd_string, stop_idx);
+
+    fprintf(stdout, "%s\n", args.ciphertext);
 }
