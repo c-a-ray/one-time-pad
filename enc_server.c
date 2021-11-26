@@ -145,6 +145,7 @@ void handle_connection(int socket_fd)
 
     int n_read = 0;
     int total_n_read = 0;
+    int stop_idx_1, stop_idx_2;
     do
     {
         n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
@@ -161,11 +162,9 @@ void handle_connection(int socket_fd)
 
         strcat(full_recd_string, buffer);
         memset(buffer, '\0', BUFFER_SIZE);
-    } while (n_read > 0);
 
-    // Find stop markers
-    int stop_idx_1, stop_idx_2;
-    find_stop_indices(full_recd_string, &stop_idx_1, &stop_idx_2);
+        find_stop_indices(full_recd_string, &stop_idx_1, &stop_idx_2);
+    } while (stop_idx_1 == -1 || stop_idx_2 == -1);
 
     // Extract plaintext from sent data
     char *plaintext = (char *) malloc(stop_idx_1 + 1);
@@ -199,8 +198,6 @@ void handle_connection(int socket_fd)
     int n_written = send(socket_fd, message, strlen(message), 0);
     if (n_written < 0)
         fprintf(stderr, "Error: failed to write to socket\n");
-
-    printf("Recd: %s\nSending: %s\n", plaintext, ciphertext);
 
     free(buffer);
     free(full_recd_string);

@@ -91,9 +91,8 @@ int main(int argc, char *argv[])
     char *buffer = (char *) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
 
-    int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0); // This breaks it for some reason
-    printf("buffer: %s\n", buffer);
-
+    int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+    printf("Server returned: %s\n", buffer);
 
     // char *buffer = (char *) malloc(BUFFER_SIZE);
     // memset(buffer, '\0', BUFFER_SIZE);
@@ -223,4 +222,5 @@ void send_string(char *string_to_send, int socket_fd)
             strcpy(message, &string_to_send[total_written - 1]);
         }
     } while (total_written < msg_len);
+    printf("Sent %s\n", string_to_send);
 }
