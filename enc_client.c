@@ -35,6 +35,7 @@ void setup_socket_addr(struct sockaddr_in *, int);
 void validate_send_values(char *, char *);
 int count_digits(int);
 void send_string(char *, int);
+int find_stop_index(char *, int *);
 
 struct Args {
     char *plaintext_filename;
@@ -88,54 +89,46 @@ int main(int argc, char *argv[])
     send_string(plaintext_string, socket_fd);
     send_string(key_string, socket_fd);
 
-    char *buffer = (char *) malloc(BUFFER_SIZE);
-    memset(buffer, '\0', BUFFER_SIZE);
-
-    int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
-    printf("Server returned: %s\n", buffer);
-
     // char *buffer = (char *) malloc(BUFFER_SIZE);
     // memset(buffer, '\0', BUFFER_SIZE);
 
-    // int full_string_size = BUFFER_SIZE;
-    // char *full_recd_string = (char *) malloc(full_string_size);
-    // memset(full_recd_string, '\0', full_string_size);
+    // int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
 
-    // int n_read = 0;
-    // int total_n_read = 0;
-    // do
-    // {
-    //     n_read = recv(socket_fd, buffer, BUFFER_SIZE, 0);
-    //     if (n_read < 0)
-    //         fprintf(stderr, "Error: failed to read from socket\n");
+    char *buffer = (char *) malloc(BUFFER_SIZE);
+    memset(buffer, '\0', BUFFER_SIZE);
 
-    //     total_n_read += n_read;
+    int full_string_size = BUFFER_SIZE;
+    char *full_recd_string = (char *) malloc(full_string_size);
+    memset(full_recd_string, '\0', full_string_size);
 
-    //     if (total_n_read % full_string_size == 0)
-    //     {
-    //         full_string_size *= 2;
-    //         full_recd_string = (char *) realloc(full_recd_string, full_string_size);
-    //     }
+    int n_read = 0;
+    int total_n_read = 0;
+    int stop_idx;
+    do
+    {
+        n_read = recv(socket_fd, buffer, BUFFER_SIZE, 0);
+        if (n_read < 0)
+            fprintf(stderr, "Error: failed to read from socket\n");
+
+        total_n_read += n_read;
+
+        if (total_n_read % full_string_size == 0)
+        {
+            full_string_size *= 2;
+            full_recd_string = (char *) realloc(full_recd_string, full_string_size);
+        }
         
-    //     strcat(full_recd_string, buffer);
-    //     memset(buffer, '\0', BUFFER_SIZE);
-    // } while (n_read > 0);
+        strcat(full_recd_string, buffer);
+        memset(buffer, '\0', BUFFER_SIZE);
 
-    // int stop_idx = -1;
-    // for (int i = 0; i < strlen(buffer); i++)
-    // {
-    //     if (buffer[i] == '@')
-    //     {
-    //         stop_idx = i;
-    //         break;
-    //     }
-    // }
+        find_stop_index(full_recd_string, &stop_idx);
+    } while (stop_idx == -1);
 
-    // char *ciphertext = (char *) malloc(stop_idx + 1);
-    // memset(ciphertext, '\0', stop_idx + 1);
-    // strncpy(ciphertext, full_recd_string, stop_idx);
+    char *ciphertext = (char *) malloc(stop_idx + 1);
+    memset(ciphertext, '\0', stop_idx + 1);
+    strncpy(ciphertext, full_recd_string, stop_idx);
 
-    // fprintf(stdout, "%s", ciphertext);
+    fprintf(stdout, "%s\n", ciphertext);
 
     return EXIT_SUCCESS;
 }
@@ -222,5 +215,17 @@ void send_string(char *string_to_send, int socket_fd)
             strcpy(message, &string_to_send[total_written - 1]);
         }
     } while (total_written < msg_len);
-    printf("Sent %s\n", string_to_send);
+}
+
+int find_stop_index(char *message, int *stop_idx)
+{
+    *stop_idx = -1;
+    for (int i = 0; i < strlen(message); i++)
+    {
+        if (message[i] == '@')
+        {
+            *stop_idx = i;
+            break;
+        }
+    }
 }
