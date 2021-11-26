@@ -28,13 +28,59 @@ Performs encryption via one-time pad
 #define BUFFER_SIZE 256
 #define STOP_SIGNAL '@'
 
+struct Args 
+{
+    char *plaintext;
+    char *key;
+    char *ciphertext;
+};
+
+int get_port(int, char **);
+int setup_listen_socket(int);
 void error_and_exit(char []);
 void setup_socket_addr(struct sockaddr_in *, int);
 void find_stop_indices(const char *, int *, int *);
 void send_string(char *, int);
 void handle_connection(int);
+void encrypt(struct Args);
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
+{
+    // Setup listening socket on user-specified port    
+    int listen_socket_fd = setup_listen_socket(get_port(argc, argv));
+
+    int n_connections = 0;
+    struct sockaddr_in client_addr;
+    socklen_t client_socklen = sizeof(client_addr);
+
+    while (true)
+    {
+        // Accept connection
+        int socket_fd = accept( listen_socket_fd, (struct sockaddr *) &client_addr, &client_socklen );
+        if (socket_fd < 0)
+            error_and_exit("Error: failed to accept connection");
+
+        n_connections++;
+        pid_t pid = fork();
+        if (pid < 0)
+            fprintf(stderr, "Error: fork() failed\n");
+        else if (pid > 0)
+            close(socket_fd);
+        else
+        {
+            if (n_connections > MAX_CONNECTIONS)
+                exit(EXIT_SUCCESS);
+                
+            close(listen_socket_fd);
+            handle_connection(socket_fd);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int get_port(int argc, char **argv)
 {
     if (argc < 2)
         error_and_exit("Usage: enc_server $port");
@@ -43,6 +89,11 @@ int main(int argc, char *argv[])
     if (port < 1 || port > MAX_PORT)
         error_and_exit("Error: a valid port number must be specified");
     
+    return port;
+}
+
+int setup_listen_socket(int port)
+{
     struct sockaddr_in server_addr;
     setup_socket_addr(&server_addr, port);
 
@@ -54,35 +105,7 @@ int main(int argc, char *argv[])
         error_and_exit("Error: failed to bind socket to port");
     
     listen(listen_socket, MAX_CONNECTIONS);
-
-    int socket_fd;
-    struct sockaddr_in client_addr;
-    socklen_t client_info_size = sizeof(client_addr);
-    int n_children = 0;
-    while (true)
-    {
-        // Connect
-        socket_fd = accept( listen_socket, (struct sockaddr *) &client_addr, &client_info_size );
-        if (socket_fd < 0)
-            error_and_exit("Error: failed to accept connection");
-
-        n_children++;
-        pid_t pid = fork();
-        if (pid < 0)
-            fprintf(stderr, "Error: fork() failed\n");
-        else if (pid > 0)
-            close(socket_fd);
-        else
-        {
-            if (n_children > 5)
-                exit(EXIT_SUCCESS);
-            close(listen_socket);
-            handle_connection(socket_fd);
-            exit(EXIT_SUCCESS);
-        }
-    }
-
-    return EXIT_SUCCESS;
+    return listen_socket;
 }
 
 void error_and_exit(char err[])
@@ -128,13 +151,33 @@ void send_string(char *string_to_send, int socket_fd)
     strcpy(message, string_to_send);
     strcat(message, "@");
 
-    int n_written = send(socket_fd, message, strlen(message), 0);
-    if (n_written < 0)
-        fprintf(stderr, "Error: failed to write to socket\n");
+    int n_written = 0;
+    int total_written = 0;
+
+    do
+    {
+        n_written = send(socket_fd, message, strlen(message), 0);
+        if (n_written < 0)
+        {
+            fprintf(stderr, "Error: failed to write to socket\n");
+            break;
+        }
+
+        total_written += n_written;
+        if (total_written < msg_len)
+        {
+            free(message);
+            message = (char *) malloc(msg_len - total_written);
+            memset(message, '\0', msg_len - total_written);
+            strcpy(message, &string_to_send[total_written - 1]);
+        }
+    } while (total_written < msg_len);
 }
 
 void handle_connection(int socket_fd)
 {
+    struct Args args;
+
     // Get data from enc_client
     char *buffer = (char *) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
@@ -165,40 +208,37 @@ void handle_connection(int socket_fd)
 
         find_stop_indices(full_recd_string, &stop_idx_1, &stop_idx_2);
     } while (stop_idx_1 == -1 || stop_idx_2 == -1);
+    
+    free(buffer);
 
     // Extract plaintext from sent data
-    char *plaintext = (char *) malloc(stop_idx_1 + 1);
-    memset(plaintext, '\0', stop_idx_1 + 1);
-    strncpy(plaintext, full_recd_string, stop_idx_1);
+    args.plaintext = (char *) malloc(stop_idx_1 + 1);
+    memset(args.plaintext, '\0', stop_idx_1 + 1);
+    strncpy(args.plaintext, full_recd_string, stop_idx_1);
 
     // Extract key from sent data
-    char *key = (char *) malloc(stop_idx_2 - stop_idx_1 + 1);
-    memset(key, '\0', stop_idx_2 - stop_idx_1 + 1);
-    strncpy(key, &full_recd_string[stop_idx_1 + 1], stop_idx_2 - stop_idx_1 - 1);
+    args.key = (char *) malloc(stop_idx_2 - stop_idx_1 + 1);
+    memset(args.key, '\0', stop_idx_2 - stop_idx_1 + 1);
+    strncpy(args.key, &full_recd_string[stop_idx_1 + 1], stop_idx_2 - stop_idx_1 - 1);
+
+    free(full_recd_string);
 
     // Create ciphertext
-    char *ciphertext = (char *) malloc(strlen(plaintext) + 1);
-    memset(ciphertext, '\0', strlen(plaintext) + 1);
-
-    for (int i = 0; i < strlen(plaintext); i++)
-    {
-        int plain_val = plaintext[i] == ' ' ? 0 : plaintext[i] - 64;
-        int key_val = key[i] == ' ' ? 0 : key[i] - 64;
-        int ciphertext_val = (plain_val + key_val) % 27;
-        ciphertext[i] = ciphertext_val == 0 ? ' ' : ciphertext_val + 64;
-    }
+    args.ciphertext = (char *) malloc(strlen(args.plaintext) + 1);
+    memset(args.ciphertext, '\0', strlen(args.plaintext) + 1);
+    encrypt(args);
 
     // Send ciphertext
-    int msg_len = strlen(ciphertext) + 1;
-    char *message = (char *) malloc(msg_len);
-    memset(message, '\0', msg_len);
-    strcpy(message, ciphertext);
-    strcat(message, "@");
+    send_string(args.ciphertext, socket_fd);
+}
 
-    int n_written = send(socket_fd, message, strlen(message), 0);
-    if (n_written < 0)
-        fprintf(stderr, "Error: failed to write to socket\n");
-
-    free(buffer);
-    free(full_recd_string);
+void encrypt(struct Args args)
+{
+    for (int i = 0; i < strlen(args.plaintext); i++)
+    {
+        int plain_val = args.plaintext[i] == ' ' ? 0 : args.plaintext[i] - 64;
+        int key_val = args.key[i] == ' ' ? 0 : args.key[i] - 64;
+        int ciphertext_val = (plain_val + key_val) % 27;
+        args.ciphertext[i] = ciphertext_val == 0 ? ' ' : ciphertext_val + 64;
+    }   
 }

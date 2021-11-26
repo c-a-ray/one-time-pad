@@ -30,13 +30,15 @@ Connects to enc_server to encrypt text
 #define LOCALHOST "LOCALHOST"
 #define BUFFER_SIZE 256
 
-struct Config {
+struct Config 
+{
     char *plaintext_filename;
     char *key_filename;
     int port;
 };
 
-struct Args {
+struct Args 
+{
     char *plaintext;
     char *key;
     char *ciphertext;
