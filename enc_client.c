@@ -99,6 +99,9 @@ int main(int argc, char *argv[])
 
     // Connect to enc_server
     int socket_fd = connect_to_server(cfg.port);
+    
+    // Send handshake
+    send_string("enc_client", socket_fd);
 
     // Send plaintext and key to enc_server
     send_string(args.plaintext, socket_fd);
@@ -142,22 +145,15 @@ void validate_send_values(char *plaintext, char *key)
         key[key_len - 1] = '\0';
 
     if (key_len < plaintext_len)
-    {
-        fprintf(stderr, "Key length: %d\nPlaintext length: %d\n", key_len, plaintext_len);
         error_and_exit("Error: key is shorter than text to encrypt");
-    }
 
     for (int i = 0; i < plaintext_len; i++)
     {
         char ch = plaintext[i];
-        // printf("%c", ch);
         if (ch == 0)
             continue;
         if ((ch < 'A' && ch != ' ') || (ch > 'Z'))
-        {
-            fprintf(stderr, "Invalid character: %d\n", ch);
             error_and_exit("Error: invalid character in plaintext file");
-        }
     }
 }
 

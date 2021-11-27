@@ -178,20 +178,31 @@ void handle_connection(int socket_fd)
 {
     struct Args args;
 
-    // Get data from enc_client
-    char *buffer = (char *) malloc(BUFFER_SIZE);
+    // Verify that connection is to enc_client
+    const char *enc_client_signal = "enc_client@";
+    int enc_client_sig_len = strlen(enc_client_signal);
+
+    char *buffer = (char *) malloc(enc_client_sig_len + 1);
+    memset(buffer, '\0', enc_client_sig_len + 1);
+
+    int n_read = recv(socket_fd, buffer, enc_client_sig_len, 0);
+    if (n_read < enc_client_sig_len || strcmp(buffer, enc_client_signal) != 0)
+        error_and_exit("Handshake failed. Invalid connection.\n");
+
+    // Get plaintext and key from enc_client
+    free(buffer);
+    buffer = (char *) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
 
     int full_string_size = BUFFER_SIZE;
     char *full_recd_string = (char *) malloc(full_string_size);
     memset(full_recd_string, '\0', full_string_size);
 
-    int n_read = 0;
     int total_n_read = 0;
     int stop_idx_1, stop_idx_2;
     do
     {
-        n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
+        int n_read = recv(socket_fd, buffer, BUFFER_SIZE - 1, 0);
         if (n_read < 0)
             fprintf(stderr, "Error: failed to read from socket\n");
 
