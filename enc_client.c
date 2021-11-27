@@ -1,13 +1,6 @@
 /*
 Usage: enc_client <plaintext> <key> <port>
 Connects to enc_server to encrypt text
-
-    - Connects to enc_server
-        - If trying to connect to dec_server, reject and report rejection to stderr
-        - If can't connect to enc_server, report to stderr with attempted port, set exit value to 2, and terminate
-    - Passes key and plaintext to enc_server
-    - When enc_client receives ciphertext from enc_server, outputs to stdout
-    - Upon successfully running, sets exit value to 0 and exits
 */
 
 #include <stdio.h>

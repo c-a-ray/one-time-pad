@@ -1,17 +1,6 @@
 /*
 Usage: enc_server <port>
 Performs encryption via one-time pad
-
-    - Listens on specified port
-    - Outputs error when executed if it can't run due to a network error like unavailable port
-    - When connection is made:
-        - Calls accept() to generate socket used for communication 
-        - Uses a separate process the rest of the servicing for this connection on the new socket
-        - Child process verifies it is communicating with enc_client
-        - Child receives plaintext and a key from enc_client
-        - Child sends the ciphertext back to enc_client
-    - Must support up to 5 concurrent socket connections
-    - Outputs errors to stderr and continues to run
 */
 
 #include <stdio.h>
