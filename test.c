@@ -2,18 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-void test_func(char *t)
-{
-    free(t);
-    t = malloc(5);
-    char *t1 = "hey!";
-    strcpy(t, t1);
-}
-
 int main(void)
 {
-    char *t = malloc(0);
-    test_func(t);
-    printf("%s\n", t);
+    printf("-12 % 27 = %d\n", mod(-12, 27));
     return 0;
+}
+
+int mod(int a, int b)
+{
+    int remainder = a % b;
+    return remainder < 0 ? remainder + b : remainder;
 }

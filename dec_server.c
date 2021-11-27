@@ -32,6 +32,7 @@ void find_stop_indices(const char *, int *, int *);
 void send_string(char *, int);
 void handle_connection(int);
 void decrypt(struct Args);
+int mod(int, int);
 
 int main(int argc, char **argv)
 {
@@ -72,7 +73,7 @@ int main(int argc, char **argv)
 int get_port(int argc, char **argv)
 {
     if (argc < 2)
-        error_and_exit("Usage: enc_server $port");
+        error_and_exit("Usage: dec_server $port");
 
     int port = atoi(argv[1]);
     if (port < 1 || port > MAX_PORT)
@@ -175,10 +176,11 @@ void handle_connection(int socket_fd)
     memset(buffer, '\0', dec_client_sig_len + 1);
 
     int n_read = recv(socket_fd, buffer, dec_client_sig_len, 0);
+        
     if (n_read < dec_client_sig_len || strcmp(buffer, dec_client_signal) != 0)
         error_and_exit("Handshake failed. Invalid connection.\n");
 
-    send_string("enc_server", socket_fd);
+    send_string("dec_server", socket_fd);
 
     // Get ciphertext and key from dec_client
     free(buffer);
@@ -234,18 +236,19 @@ void handle_connection(int socket_fd)
     send_string(args.plaintext, socket_fd);
 }
 
-
-/*
-    FIX DECRYPT. NEED ALGORITHM.
-*/
-
 void decrypt(struct Args args)
 {
     for (int i = 0; i < strlen(args.ciphertext); i++)
     {
         int cipher_val = args.ciphertext[i] == ' ' ? 0 : args.ciphertext[i] - 64;
         int key_val = args.key[i] == ' ' ? 0 : args.key[i] - 64;
-        int plain_val = (cipher_val + key_val) % 27;
-        args.ciphertext[i] = plain_val == 0 ? ' ' : plain_val + 64;
-    }   
+        int plain_val = mod(cipher_val - key_val, 27);
+        args.plaintext[i] = plain_val == 0 ? ' ' : plain_val + 64;
+    }
+}
+
+int mod(int a, int b)
+{
+    int remainder = a % b;
+    return remainder < 0 ? remainder + b : remainder;
 }

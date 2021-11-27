@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     // Get key from file
     FILE *fp_key = fopen(cfg.key_filename, "rb");
     if (fp_key == 0)
-        error_and_exit("Error: failed to open plaintext file");
+        error_and_exit("Error: failed to open key file");
 
     fseek(fp_key, 0, SEEK_END);
     f_size = ftell(fp_key);

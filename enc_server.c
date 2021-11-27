@@ -238,9 +238,19 @@ void encrypt(struct Args args)
 {
     for (int i = 0; i < strlen(args.plaintext); i++)
     {
+        printf("Plaintext value: %c\n", args.plaintext[i]);
+        printf("Key value: %c\n", args.key[i]);
+
+
         int plain_val = args.plaintext[i] == ' ' ? 0 : args.plaintext[i] - 64;
         int key_val = args.key[i] == ' ' ? 0 : args.key[i] - 64;
         int ciphertext_val = (plain_val + key_val) % 27;
+
+        printf("Plaintext + Key = %d\n", plain_val + key_val);
+        printf("Mod 27 = %d\n", ciphertext_val);
+
         args.ciphertext[i] = ciphertext_val == 0 ? ' ' : ciphertext_val + 64;
+
+        printf("Add 64 = %c\n\n\n", args.ciphertext[i]);
     }   
 }

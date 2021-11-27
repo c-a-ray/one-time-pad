@@ -54,22 +54,23 @@ int main(int argc, char *argv[])
     struct Args args;
 
     // Get ciphertext from file
-    FILE *fp_ciphertext = fopen(cfg.plaintext_filename, "rb");
+    FILE *fp_ciphertext = fopen(cfg.ciphertext_filename, "rb");
+        
     if (fp_ciphertext == 0)
-        error_and_exit("Error: failed to open plaintext file");
+        error_and_exit("Error: failed to open ciphertext file");
 
     fseek(fp_ciphertext, 0, SEEK_END);
     long f_size = ftell(fp_ciphertext);
     fseek(fp_ciphertext, 0, SEEK_SET);
 
-    args.plaintext = (char *) malloc(f_size);
+    args.ciphertext = (char *) malloc(f_size + 1);
     fread(args.ciphertext, f_size, 1, fp_ciphertext);
     fclose(fp_ciphertext);
 
     // Get key from file
     FILE *fp_key = fopen(cfg.key_filename, "rb");
     if (fp_key == 0)
-        error_and_exit("Error: failed to open plaintext file");
+        error_and_exit("Error: failed to open key file");
 
     fseek(fp_key, 0, SEEK_END);
     f_size = ftell(fp_key);
@@ -91,6 +92,7 @@ int main(int argc, char *argv[])
     char *handshake_response = malloc(BUFFER_SIZE);
     memset(handshake_response, '\0', BUFFER_SIZE);
     int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
+
     if (strcmp(handshake_response, "dec_server@") != 0)
         error_and_exit("Handshake failed. Invalid connection.\n");
 
