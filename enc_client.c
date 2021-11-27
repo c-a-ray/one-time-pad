@@ -2,14 +2,6 @@
 Usage: enc_client <plaintext> <key> <port>
 Connects to enc_server to encrypt text
 
-    - The plaintext argument is the name of a file containing the text to encrypt in the current directory
-    - The key argument is the name of a file containing a key in the current directory
-    - The port parameter is the port that enc_client should try to connect to enc_server on
-
-    - Run validation and output appropriate error to stderr. Check:
-        - There are no invalid characters in the plaintext file
-        - There are no invalid characters in the key file
-        - The key file has at least as many characters as the plaintext file
     - Connects to enc_server
         - If trying to connect to dec_server, reject and report rejection to stderr
         - If can't connect to enc_server, report to stderr with attempted port, set exit value to 2, and terminate
@@ -102,6 +94,12 @@ int main(int argc, char *argv[])
     
     // Send handshake
     send_string("enc_client", socket_fd);
+    
+    char *handshake_response = malloc(BUFFER_SIZE);
+    memset(handshake_response, '\0', BUFFER_SIZE);
+    int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
+    if (strcmp(handshake_response, "enc_server@") != 0)
+        error_and_exit("Handshake failed. Invalid connection.\n");
 
     // Send plaintext and key to enc_server
     send_string(args.plaintext, socket_fd);

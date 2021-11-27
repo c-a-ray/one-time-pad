@@ -189,6 +189,8 @@ void handle_connection(int socket_fd)
     if (n_read < enc_client_sig_len || strcmp(buffer, enc_client_signal) != 0)
         error_and_exit("Handshake failed. Invalid connection.\n");
 
+    send_string("enc_server", socket_fd);
+
     // Get plaintext and key from enc_client
     free(buffer);
     buffer = (char *) malloc(BUFFER_SIZE);
