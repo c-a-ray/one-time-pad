@@ -12,7 +12,9 @@ Connects to enc_server to encrypt text
 #include <netdb.h>
 #include <stdbool.h>
 
-#define LOCALHOST "LOCALHOST"
+#include "socket_io.h"
+#include "util.h"
+
 #define BUFFER_SIZE 4096
 
 struct Config 
@@ -29,20 +31,18 @@ struct Args
     char *ciphertext;
 };
 
-void error_and_exit(char []);
-void setup_socket_addr(struct sockaddr_in *, int);
-void validate_send_values(char *, char *);
-int connect_to_server(int);
-int count_digits(int);
-void send_string(char *, int);
-int find_stop_index(char *, int *);
+bool perform_handshake(int);
 void get_ciphertext_from_server(int, struct Args);
 
 int main(int argc, char *argv[])
 {
     // Get command line arguments
     if (argc < 4)
-        error_and_exit("Usage: enc_client $plaintext $key $port");
+    {
+        fprintf(stderr, "Missing %d arguments\n", 4 - argc);
+        fprintf(stderr, "Usage: enc_client $plaintext $key $port\n");
+        return EXIT_FAILURE;
+    }
 
     struct Config cfg = {
         plaintext_filename: argv[1],
@@ -56,43 +56,68 @@ int main(int argc, char *argv[])
     // Get plaintext from file
     FILE *fp_plaintext = fopen(cfg.plaintext_filename, "rb");
     if (fp_plaintext == 0)
-        error_and_exit("Error: failed to open plaintext file");
+    {
+        fprintf(stderr, "Error: failed to open plaintext file \"%s\"\n", cfg.plaintext_filename);
+        return EXIT_FAILURE;
+    }
 
     fseek(fp_plaintext, 0, SEEK_END);
     long f_size = ftell(fp_plaintext);
     fseek(fp_plaintext, 0, SEEK_SET);
 
-    args.plaintext = (char *) malloc(sizeof(char) * (f_size + 1));
+    args.plaintext = (char *) malloc(f_size + 1);
     fread(args.plaintext, f_size, 1, fp_plaintext);
     fclose(fp_plaintext);
 
     // Get key from file
     FILE *fp_key = fopen(cfg.key_filename, "rb");
     if (fp_key == 0)
-        error_and_exit("Error: failed to open key file");
+    {
+        fprintf(stderr, "Error: failed to open key file \"%s\"\n", cfg.key_filename);
+        return EXIT_FAILURE;
+    }
 
     fseek(fp_key, 0, SEEK_END);
     f_size = ftell(fp_key);
     fseek(fp_key, 0, SEEK_SET);
 
-    args.key = (char *) malloc(sizeof(char) * (f_size + 1));
+    args.key = (char *) malloc(f_size + 1);
     fread(args.key, f_size, 1, fp_key);
     fclose(fp_key);
 
-    // Validate plaintext and key; replace newline with NULL character
-    validate_send_values(args.plaintext, args.key);
+    // Replace newline with null character in plaintext and check for invalid characters
+    replace_newline(args.plaintext);
+    char invalid_char = validate_message(args.plaintext);
+    if (invalid_char != 0)
+    {
+        fprintf(stderr, "Error: invalid character in plaintext file: %c\n", invalid_char);
+        return EXIT_FAILURE;
+    }
+
+    // Replace newline with null character in key
+    replace_newline(args.key);
+
+    // Make sure key is long enough
+    if (strlen(args.plaintext) > strlen(args.key))
+    {
+        fprintf(stderr, "Error: plaintext is longer than key\n");
+        fprintf(stderr, "Plaintext length: %d\tKey length: %d\n", strlen(args.plaintext), strlen(args.key));
+        return EXIT_FAILURE;
+    }
 
     // Connect to enc_server
     int socket_fd = connect_to_server(cfg.port);
+    if (socket_fd < 0)
+    {
+        fprintf(stderr, "Error: failed to connect to server at port %d\n", cfg.port);
+        return EXIT_FAILURE;
+    }
     
-    // Send handshake
-    send_string("enc_client", socket_fd);
-    
-    char *handshake_response = malloc(BUFFER_SIZE);
-    memset(handshake_response, '\0', BUFFER_SIZE);
-    int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
-    if (strcmp(handshake_response, "enc_server@") != 0)
-        error_and_exit("Handshake failed. Invalid connection.\n");
+    if (!perform_handshake(socket_fd))
+    {
+        fprintf(stderr, "Error: connection refused\n");
+        return EXIT_FAILURE;
+    }
 
     // Send plaintext and key to enc_server
     send_string(args.plaintext, socket_fd);
@@ -104,118 +129,15 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-void error_and_exit(char err[])
+bool perform_handshake(int socket_fd)
 {
-    fprintf(stderr, "%s\n", err);
-    exit(EXIT_FAILURE);
-}
-
-void setup_socket_addr(struct sockaddr_in *address, int port)
-{
-    memset( (char*) address, '\0', sizeof(*address) );
+    send_string("enc_client", socket_fd);
     
-    address->sin_family = AF_INET;
-    address->sin_port = htons(port);
+    char *handshake_response = malloc(BUFFER_SIZE);
+    memset(handshake_response, '\0', BUFFER_SIZE);
 
-    struct hostent *host_info = gethostbyname(LOCALHOST);
-    if (host_info == NULL)
-        error_and_exit("Error: host not found");
-
-    memcpy( (char *) &address->sin_addr.s_addr, host_info->h_addr_list[0], host_info->h_length );
-}
-
-void validate_send_values(char *plaintext, char *key)
-{
-    int plaintext_len = strlen(plaintext);
-    int key_len = strlen(key);
-
-    if (plaintext[plaintext_len - 1] == '\n')
-        plaintext[plaintext_len - 1] = '\0';
-    
-    if(key[key_len - 1] == '\n')
-        key[key_len - 1] = '\0';
-
-    if (key_len < plaintext_len)
-        error_and_exit("Error: key is shorter than text to encrypt");
-
-    for (int i = 0; i < plaintext_len; i++)
-    {
-        char ch = plaintext[i];
-        if (ch == 0)
-            continue;
-        if ((ch < 'A' && ch != ' ') || (ch > 'Z'))
-            error_and_exit("Error: invalid character in plaintext file");
-    }
-}
-
-int connect_to_server(int port)
-{
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0); 
-    if (socket_fd < 0)
-        error_and_exit("Error: failed to open socket");
-
-    struct sockaddr_in server_addr;
-    setup_socket_addr(&server_addr, port);
-
-    if ( connect(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) )
-        error_and_exit("Error: failed to connect to enc_server");   
-
-    return socket_fd; 
-}
-
-int count_digits(int n)
-{
-    int count = 0;
-    while (n > 0)
-    {
-        n = n / 10;
-        count++;
-    }
-    return count;
-}
-
-void send_string(char *string_to_send, int socket_fd)
-{
-    int msg_len = strlen(string_to_send) + 1;
-    char *message = (char *) malloc(msg_len);
-    memset(message, '\0', msg_len);
-    strcpy(message, string_to_send);
-    strcat(message, "@");
-
-    int n_written = 0;
-    int total_written = 0;
-
-    do
-    {
-        n_written = send(socket_fd, message, strlen(message), 0);
-        if (n_written < 0)
-        {
-            fprintf(stderr, "Error: failed to write to socket\n");
-            break;
-        }
-
-        total_written += n_written;
-        if (total_written < msg_len)
-        {
-            free(message);
-            message = (char *) malloc(msg_len - total_written);
-            memset(message, '\0', msg_len - total_written);
-            strcpy(message, &string_to_send[total_written - 1]);
-        }
-    } while (total_written < msg_len);
-}
-
-int find_stop_index(char *message, int *stop_idx)
-{
-    *stop_idx = -1;
-    for (int i = 0; i < strlen(message); i++)
-    {
-        if (message[i] == '@')
-        {
-            *stop_idx = i;
-            break;
-        }
-    }
+    int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
+    return strcmp(handshake_response, "enc_server@") == 0;
 }
 
 void get_ciphertext_from_server(int socket_fd, struct Args args)
