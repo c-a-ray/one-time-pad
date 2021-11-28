@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     char invalid_char = validate_message(args.plaintext);
     if (invalid_char != 0)
     {
-        fprintf(stderr, "Error: invalid character in plaintext file: %c\n", invalid_char);
+        fprintf(stderr, "Error: invalid character in plaintext file \"%s\": %c\n", cfg.plaintext_filename, invalid_char);
         return EXIT_FAILURE;
     }
 

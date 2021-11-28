@@ -1,7 +1,7 @@
 #!/bin/bash
 gcc -std=gnu99 -o keygen keygen.c
 
-gcc -std=gnu99 -c util util.c
+gcc -std=gnu99 -c util.c
 gcc -std=gnu99 -c socket_io.c
 gcc -std=gnu99 -c enc_client.c
 gcc -std=gnu99 -c enc_server.c

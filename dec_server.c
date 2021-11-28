@@ -9,6 +9,7 @@ Performs decryption via one-time pad
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 
@@ -23,8 +24,13 @@ struct Args
 };
 
 int get_port(int, char **);
+void handle_SIGCHLD(int);
+bool catch_SIGCHLD(void);
 void handle_connection(int);
 void decrypt(struct Args);
+
+// Number of currently running processes
+int n_connections = 0;
 
 int main(int argc, char **argv)
 {
@@ -38,13 +44,17 @@ int main(int argc, char **argv)
     if (listen_socket_fd < 0)
         return EXIT_FAILURE;
 
-    int n_connections = 0;
+    // Setup SIGCHLD signal handler to clean up children on termination
+    if (!catch_SIGCHLD())
+        return EXIT_FAILURE;
+
+    // Setup client socket address
     struct sockaddr_in client_addr;
     socklen_t client_socklen = sizeof(client_addr);
 
     while (true)
     {
-        // Accept connection
+        // Accept connection and check for error
         int socket_fd = accept( listen_socket_fd, (struct sockaddr *) &client_addr, &client_socklen );
         if (socket_fd < 0)
         {
@@ -53,19 +63,22 @@ int main(int argc, char **argv)
         }
 
         n_connections++;
+
         pid_t pid = fork();
-        if (pid < 0)
-            fprintf(stderr, "Error: fork() failed\n");
-        else if (pid > 0)
-            close(socket_fd);
-        else
+        switch (pid)
         {
-            if (n_connections > MAX_CONNECTIONS)
+            case -1:
+                fprintf(stderr, "Error: fork() failed\n");
+                exit(EXIT_FAILURE);
+            case 0:
+                if (n_connections > MAX_CONNECTIONS)
+                    exit(EXIT_SUCCESS);
+
+                close(listen_socket_fd);
+                handle_connection(socket_fd);
                 exit(EXIT_SUCCESS);
-                
-            close(listen_socket_fd);
-            handle_connection(socket_fd);
-            exit(EXIT_SUCCESS);
+            default:
+                close(socket_fd);
         }
     }
 
@@ -91,6 +104,26 @@ int get_port(int argc, char **argv)
     return port;
 }
 
+void handle_SIGCHLD(int signo)
+{
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+        n_connections--;
+}
+
+bool catch_SIGCHLD(void)
+{
+    struct sigaction sa_SIGCHLD;
+    sa_SIGCHLD.sa_handler = handle_SIGCHLD;
+    sigemptyset(&sa_SIGCHLD.sa_mask);
+    sa_SIGCHLD.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa_SIGCHLD, NULL) == -1)
+    {
+        fprintf(stderr, "Error: failed to setup handler for child termination signal\n");
+        return false;
+    }
+    return true;
+}
+
 void handle_connection(int socket_fd)
 {
     struct Args args;
@@ -109,7 +142,7 @@ void handle_connection(int socket_fd)
         fprintf(stderr, "Error: connection refused\n");
         return;
     }
-    
+
     send_string("dec_server", socket_fd);
 
     // Get ciphertext and key from dec_client
