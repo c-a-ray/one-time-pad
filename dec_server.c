@@ -27,6 +27,7 @@ int get_port(int, char **);
 void handle_SIGCHLD(int);
 bool catch_SIGCHLD(void);
 void handle_connection(int);
+bool perform_handshake(int);
 void decrypt(struct Args);
 
 // Number of currently running processes
@@ -129,25 +130,11 @@ void handle_connection(int socket_fd)
     struct Args args;
 
     // Verify that connection is to dec_client
-    const char *dec_client_signal = "dec_client@";
-    int dec_client_sig_len = strlen(dec_client_signal);
-
-    char *buffer = (char *) malloc(dec_client_sig_len + 1);
-    memset(buffer, '\0', dec_client_sig_len + 1);
-
-    int n_read = recv(socket_fd, buffer, dec_client_sig_len, 0);
-        
-    if (n_read < dec_client_sig_len || strcmp(buffer, dec_client_signal) != 0)
-    {
-        fprintf(stderr, "Error: connection refused\n");
+    if (!perform_handshake(socket_fd))
         return;
-    }
-
-    send_string("dec_server", socket_fd);
 
     // Get ciphertext and key from dec_client
-    free(buffer);
-    buffer = (char *) malloc(BUFFER_SIZE);
+    char *buffer = (char *) malloc(BUFFER_SIZE);
     memset(buffer, '\0', BUFFER_SIZE);
 
     int full_string_size = BUFFER_SIZE;
@@ -197,6 +184,25 @@ void handle_connection(int socket_fd)
 
     // Send plaintext
     send_string(args.plaintext, socket_fd);
+}
+
+bool perform_handshake(int socket_fd)
+{
+    const char *dec_client_signal = "dec_client@";
+    int dec_client_sig_len = strlen(dec_client_signal);
+
+    char *buffer = (char *) malloc(dec_client_sig_len + 1);
+    memset(buffer, '\0', dec_client_sig_len + 1);
+
+    int n_read = recv(socket_fd, buffer, dec_client_sig_len, 0);
+    
+    bool success = true;
+    if (n_read < dec_client_sig_len || strcmp(buffer, dec_client_signal) != 0)
+        success = false;
+
+    send_string("dec_server", socket_fd);
+    free(buffer);
+    return success;
 }
 
 void decrypt(struct Args args)

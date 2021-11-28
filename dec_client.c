@@ -29,6 +29,7 @@ struct Args
     char *plaintext;
 };
 
+bool perform_handshake(int);
 void get_plaintext_from_server(int, struct Args);
 
 int main(int argc, char *argv[])
@@ -104,18 +105,9 @@ int main(int argc, char *argv[])
     // Connect to dec_server
     int socket_fd = connect_to_server(cfg.port);
     
-    // Send handshake
-    send_string("dec_client", socket_fd);
-    
-    char *handshake_response = malloc(BUFFER_SIZE);
-    memset(handshake_response, '\0', BUFFER_SIZE);
-    int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
-
-    if (strcmp(handshake_response, "dec_server@") != 0)
-    {
-        fprintf(stderr, "Error: connection refused\n");
+    // Verify that dec_client is connecting to dec_server
+    if (!perform_handshake(socket_fd))
         return EXIT_FAILURE;
-    }
 
     // Send ciphertext and key to dec_server
     send_string(args.ciphertext, socket_fd);
@@ -125,6 +117,29 @@ int main(int argc, char *argv[])
     get_plaintext_from_server(socket_fd, args);
 
     return EXIT_SUCCESS;
+}
+
+bool perform_handshake(int socket_fd)
+{
+    send_string("dec_client", socket_fd);
+    
+    char *handshake_response = malloc(BUFFER_SIZE);
+    memset(handshake_response, '\0', BUFFER_SIZE);
+
+    int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
+    
+    if ( strcmp(handshake_response, "enc_server@") == 0 )
+    {
+        fprintf(stderr, "Error: connection refused: dec_client cannot connect to enc_server\n");
+        return false;
+    }
+    if ( !strcmp(handshake_response, "dec_server@") == 0 )
+    {
+        fprintf(stderr, "Error: connection refused: unknown server: %s\n", handshake_response);
+        return false;
+    }
+
+    return true;
 }
 
 void get_plaintext_from_server(int socket_fd, struct Args args)
