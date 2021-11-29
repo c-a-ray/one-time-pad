@@ -134,7 +134,7 @@ bool perform_handshake(int socket_fd)
     }
 
     // If connected server is not recognized, refuse connection
-    if ( !strcmp(handshake_response, "dec_server@") != 0 )
+    if ( strcmp(handshake_response, "dec_server@") != 0 )
     {
         fprintf(stderr, "Error: connection refused: unknown server: %s\n", handshake_response);
         return false;

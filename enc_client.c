@@ -110,10 +110,7 @@ int main(int argc, char *argv[])
     
     // Verify that connection is to enc_server
     if (!perform_handshake(socket_fd))
-    {
-        fprintf(stderr, "Error: connection refused\n");
         return EXIT_FAILURE;
-    }
 
     // Send plaintext and key to enc_server
     send_string(args.plaintext, socket_fd);
@@ -129,7 +126,7 @@ bool perform_handshake(int socket_fd)
 {
     // Identify self to server
     send_string("enc_client", socket_fd);
-    
+
     // Wait for server to identify itself
     char *handshake_response = malloc(BUFFER_SIZE);
     memset(handshake_response, '\0', BUFFER_SIZE);
@@ -143,7 +140,7 @@ bool perform_handshake(int socket_fd)
     }
 
     // If connected server is not recognized, refuse connection
-    if ( strcmp(handshake_response, "dec_server@") != 0 )
+    if ( strcmp(handshake_response, "enc_server@") != 0 )
     {
         fprintf(stderr, "Error: connection refused: unknown server: %s\n", handshake_response);
         return false;
