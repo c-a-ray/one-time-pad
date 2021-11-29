@@ -135,8 +135,22 @@ bool perform_handshake(int socket_fd)
     memset(handshake_response, '\0', BUFFER_SIZE);
     int n_read = recv(socket_fd, handshake_response, BUFFER_SIZE, 0);
 
+    // If connected server is dec_server, refuse connection
+    if ( strcmp(handshake_response, "dec_server@") == 0 )
+    {
+        fprintf(stderr, "Error: connection refused: enc_client cannot connect to dec_server\n");
+        return false;
+    }
+
+    // If connected server is not recognized, refuse connection
+    if ( strcmp(handshake_response, "dec_server@") != 0 )
+    {
+        fprintf(stderr, "Error: connection refused: unknown server: %s\n", handshake_response);
+        return false;
+    }
+
     // Return true if connected to enc_server
-    return strcmp(handshake_response, "enc_server@") == 0;
+    return true;
 }
 
 void get_ciphertext_from_server(int socket_fd, struct Args args)
@@ -164,7 +178,7 @@ void get_ciphertext_from_server(int socket_fd, struct Args args)
         total_n_read += n_read;
 
         // If the message is larger than full_recd_string, resize full_recd_string
-        if (total_n_read % full_string_size == 0)
+        if ((float) total_n_read / (float) full_string_size > 1)
         {
             full_string_size *= 2;
             full_recd_string = (char *) realloc(full_recd_string, full_string_size);
@@ -173,7 +187,7 @@ void get_ciphertext_from_server(int socket_fd, struct Args args)
         // Add contents of buffer to full_recd_string
         strcat(full_recd_string, buffer);
 
-        // Zero out buffer
+        // Zero out buffer for re-use
         memset(buffer, '\0', BUFFER_SIZE);
 
         // Search for stop character
@@ -185,6 +199,10 @@ void get_ciphertext_from_server(int socket_fd, struct Args args)
     args.ciphertext = (char *) malloc(stop_idx + 1);
     memset(args.ciphertext, '\0', stop_idx + 1);
     strncpy(args.ciphertext, full_recd_string, stop_idx);
+
+    // Free allocated memory
+    free(buffer);
+    free(full_recd_string);
 
     // Write ciphertext to stdout
     fprintf(stdout, "%s\n", args.ciphertext);

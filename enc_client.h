@@ -41,7 +41,7 @@ struct Args
 bool perform_handshake(int);
 
 /**
- * Reads ciphertext from enc_server, then writes ciphertext to stdout.
+ * Reads ciphertext from enc_server and writes it to stdout
  * 
  * @param  socket_fd file descriptor for connected socket
  * @param  args object to store plaintext, key, and ciphertext
