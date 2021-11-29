@@ -1,3 +1,15 @@
+/**
+ * @file socket_io.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * Definitions for socket_io.c
+ */
+
 #ifndef SOCKET_IO
 #define SOCKET_IO
 

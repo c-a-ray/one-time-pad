@@ -1,3 +1,15 @@
+/**
+ * @file util.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * Contains shared helper functions
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

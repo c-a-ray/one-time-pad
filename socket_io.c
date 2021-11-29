@@ -1,3 +1,15 @@
+/**
+ * @file socket_io.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * Contains shared functions used for setting up, connecting, and writing to a socket.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

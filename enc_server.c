@@ -1,7 +1,19 @@
-/*
-Usage: enc_server <port>
-Performs encryption via one-time pad
-*/
+/**
+ * @file enc_server.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * enc_server listens on specified port for connections from enc_client.
+ * Each new connection is run in a separate process. Five processes can run at a time.
+ * When plaintext and key are received, enc_server encrypts the plaintext using
+ * one-time-pad encryption and sends ciphertext to enc_client.
+ * 
+ * Usage: enc_server <port>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,22 +25,9 @@ Performs encryption via one-time pad
 #include <netinet/in.h>
 #include <stdbool.h>
 
+#include "enc_server.h"
 #include "socket_io.h"
 #include "util.h"
-
-struct Args 
-{
-    char *plaintext;
-    char *key;
-    char *ciphertext;
-};
-
-int get_port(int, char **);
-void handle_SIGCHLD(int);
-bool catch_SIGCHLD(void);
-void handle_connection(int);
-bool perform_handshake(int);
-void encrypt(struct Args);
 
 // Number of currently running processes
 int n_connections = 0;

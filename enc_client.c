@@ -1,7 +1,18 @@
-/*
-Usage: enc_client <plaintext> <key> <port>
-Connects to enc_server to encrypt text
-*/
+/**
+ * @file enc_client.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * Connects and sends plaintext and key to enc_server at specified port.
+ * If enc_server is not running on specified port, connection is refused.
+ * After enc_server responds with ciphertext, ciphertext is written to stdout.
+ * 
+ * Usage: enc_client <plaintext> <key> <port>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,27 +23,9 @@ Connects to enc_server to encrypt text
 #include <netdb.h>
 #include <stdbool.h>
 
+#include "enc_client.h"
 #include "socket_io.h"
 #include "util.h"
-
-#define BUFFER_SIZE 4096
-
-struct Config 
-{
-    char *plaintext_filename;
-    char *key_filename;
-    int port;
-};
-
-struct Args 
-{
-    char *plaintext;
-    char *key;
-    char *ciphertext;
-};
-
-bool perform_handshake(int);
-void get_ciphertext_from_server(int, struct Args);
 
 int main(int argc, char *argv[])
 {

@@ -1,7 +1,18 @@
-/*
-Usage: dec_client <plaintext> <key> <port>
-Connects to dec_server to decrypt text
-*/
+/**
+ * @file dec_client.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * Connects and sends ciphertext and key to dec_server at specified port.
+ * If dec_server is not running on specified port, connection is refused.
+ * After dec_server responds with plaintext, plaintext is written to stdout.
+ * 
+ * Usage: dec_client <plaintext> <key> <port>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,25 +23,9 @@ Connects to dec_server to decrypt text
 #include <netdb.h>
 #include <stdbool.h>
 
+#include "dec_client.h"
 #include "socket_io.h"
 #include "util.h"
-
-struct Config 
-{
-    char *ciphertext_filename;
-    char *key_filename;
-    int port;
-};
-
-struct Args 
-{
-    char *ciphertext;
-    char *key;
-    char *plaintext;
-};
-
-bool perform_handshake(int);
-void get_plaintext_from_server(int, struct Args);
 
 int main(int argc, char *argv[])
 {

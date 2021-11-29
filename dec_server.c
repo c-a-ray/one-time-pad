@@ -1,7 +1,19 @@
-/*
-Usage: dec_server <port>
-Performs decryption via one-time pad
-*/
+/**
+ * @file dec_server.c
+ * @author Cody Ray <rayc2@oregonstate.edu>
+ * @version 1.0
+ * @section DESCRIPTION
+ *
+ * For OSU CS 344
+ * Assignment 5
+ * 
+ * dec_server listens on specified port for connections from dec_client.
+ * Each new connection is run in a separate process. Five processes can run at a time.
+ * When ciphertext and key are received, dec_server decrypts the ciphertext using
+ * one-time-pad and sends plaintext to dec_client.
+ * 
+ * Usage: dec_server <port>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,22 +25,9 @@ Performs decryption via one-time pad
 #include <netinet/in.h>
 #include <stdbool.h>
 
+#include "dec_server.h"
 #include "socket_io.h"
 #include "util.h"
-
-struct Args 
-{
-    char *ciphertext;
-    char *key;
-    char *plaintext;
-};
-
-int get_port(int, char **);
-void handle_SIGCHLD(int);
-bool catch_SIGCHLD(void);
-void handle_connection(int);
-bool perform_handshake(int);
-void decrypt(struct Args);
 
 // Number of currently running processes
 int n_connections = 0;
