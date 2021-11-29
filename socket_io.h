@@ -15,7 +15,7 @@
 
 #define LOCALHOST "LOCALHOST"
 #define MAX_CONNECTIONS 5
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 81920
 #define MAX_PORT 65535
 
 /**
