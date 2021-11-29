@@ -109,7 +109,7 @@ int get_port(int argc, char **argv)
     // Verify that specified port is a valid port number
     if (port < 1 || port > MAX_PORT)
     {
-        fprintf(stderr, "Error: invalid port: %s\n", port);
+        fprintf(stderr, "Error: invalid port: %d\n", port);
         return 0;
     }
     
@@ -121,8 +121,9 @@ void handle_SIGCHLD(int signo)
 {
     // Perform non-blocking wait for any child process
     // When child terminates, decrement the number of connections
-    while (waitpid(-1, NULL, WNOHANG) > 0);
-        n_connections--;
+    while (waitpid(-1, NULL, WNOHANG) > 0)
+        continue;
+    n_connections--;
 }
 
 bool catch_SIGCHLD(void)
