@@ -122,7 +122,7 @@ int setup_listen_socket(int port)
     // Bind listening socket to specified port
     if ( bind( listen_socket, (struct sockaddr *) &server_addr, sizeof(server_addr) ) < 0 )
     {
-        fprintf(stderr, "Error: failed to bind socket to port\n");
+        fprintf(stderr, "Error: port %d is unavailable\n", port);
         return -1;
     }
     
