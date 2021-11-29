@@ -13,6 +13,7 @@
 #ifndef ENC_CLIENT
 #define ENC_CLIENT
 
+// Object to store arguments given by user
 struct Config 
 {
     char *plaintext_filename;
@@ -20,6 +21,7 @@ struct Config
     int port;
 };
 
+// Object to store plaintext, key and ciphertext
 struct Args 
 {
     char *plaintext;
@@ -27,7 +29,23 @@ struct Args
     char *ciphertext;
 };
 
+/**
+ * Verifies that established connection is to enc_server.
+ * Identifies self as enc_client and waits for enc_server to identify itself.
+ * If connected server is enc_server, function returns true, otherwise false.
+ * 
+ * @param  socket_fd file descriptor for connected socket
+ * 
+ * @return true if connection is to enc_server, else false
+ */
 bool perform_handshake(int);
+
+/**
+ * Reads ciphertext from enc_server, then writes ciphertext to stdout.
+ * 
+ * @param  socket_fd file descriptor for connected socket
+ * @param  args object to store plaintext, key, and ciphertext
+ */
 void get_ciphertext_from_server(int, struct Args);
 
 #endif
