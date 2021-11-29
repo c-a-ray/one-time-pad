@@ -219,6 +219,11 @@ void handle_connection(int socket_fd)
 
     // Send plaintext
     send_string(args.plaintext, socket_fd);
+
+    // Free memory allocated for args
+    free(args.plaintext);
+    free(args.key);
+    free(args.ciphertext);
 }
 
 bool perform_handshake(int socket_fd)
